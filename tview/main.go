@@ -9,13 +9,13 @@ import (
 )
 
 type AppState struct {
-	app  *tview.Application
-	grid *tview.Grid
-	menu *tview.List
-	main *tview.TextView
-	// sidebar *tview.Table
-	header *tview.TextView
-	footer *tview.TextView
+	app     *tview.Application
+	grid    *tview.Grid
+	menu    *tview.List
+	main    *tview.TextView
+	sidebar *tview.Table
+	header  *tview.TextView
+	footer  *tview.TextView
 }
 
 // Dummy data functions
@@ -24,10 +24,18 @@ func getMenuItems() []string {
 }
 
 func getMainContent(section string) string {
+	sidebarInfo := "\n\n[yellow]System Status[white]\n" +
+		"[green]CPU:[white] 45% (OK)\n" +
+		"[orange]Memory:[white] 67% (Warning)\n" +
+		"[green]Disk:[white] 23% (OK)\n" +
+		"[green]Network:[white] 12MB/s (OK)\n" +
+		"[orange]Errors:[white] 3 (Warning)\n" +
+		"[green]Uptime:[white] 5d 12h (OK)"
+
 	content := map[string]string{
-		"Dashboard": "Welcome to the dashboard!\n\nSystem Status: Online\nActive Users: 42\nLast Update: " + time.Now().Format("15:04:05"),
+		"Dashboard": "Welcome to the dashboard!\n\nSystem Status: Online\nActive Users: 42\nLast Update: " + time.Now().Format("15:04:05") + sidebarInfo,
 		"Users":     "User Management\n\nTotal Users: 1,234\nActive: 987\nInactive: 247\n\nRecent Activity:\n- John logged in\n- Jane updated profile\n- Bob logged out",
-		"Settings":  "Application Settings\n\nTheme: Dark\nLanguage: English\nNotifications: Enabled\nAuto-save: Every 5 minutes",
+		"Settings":  "Application Settings\n\nTheme: Rose Pine\nLanguage: English\nNotifications: Enabled\nAuto-save: Every 5 minutes",
 		"Reports":   "System Reports\n\nDaily Active Users: 156\nError Rate: 0.02%\nResponse Time: 45ms\nUptime: 99.9%",
 		"Help":      "Help & Documentation\n\nUser Guide: Available\nAPI Docs: /api/docs\nSupport: help@company.com\nVersion: 1.2.3",
 	}
@@ -37,20 +45,20 @@ func getMainContent(section string) string {
 	return "Select a menu item to view content"
 }
 
-// func getSidebarData() [][]string {
-// 	return [][]string{
-// 		{"Metric", "Value", "Status"},
-// 		{"CPU", "45%", "OK"},
-// 		{"Memory", "67%", "Warning"},
-// 		{"Disk", "23%", "OK"},
-// 		{"Network", "12MB/s", "OK"},
-// 		{"Errors", "3", "Warning"},
-// 		{"Uptime", "5d 12h", "OK"},
-// 	}
-// }
+func getSidebarData() [][]string {
+	return [][]string{
+		{"Metric", "Value", "Status"},
+		{"CPU", "45%", "OK"},
+		{"Memory", "67%", "Warning"},
+		{"Disk", "23%", "OK"},
+		{"Network", "12MB/s", "OK"},
+		{"Errors", "3", "Warning"},
+		{"Uptime", "5d 12h", "OK"},
+	}
+}
 
 func getHeaderText() string {
-	return fmt.Sprintf("TUI Dashboard - %s", time.Now().Format("2006-01-02 15:04:05"))
+	return fmt.Sprintf("TUI Dashboard (Rose Pine) - %s", time.Now().Format("2006-01-02 15:04:05"))
 }
 
 func getFooterText() string {
@@ -77,44 +85,46 @@ func createMainContent() *tview.TextView {
 	textView.SetBorder(true).SetTitle("Main Content")
 	textView.SetText(getMainContent("Dashboard"))
 	textView.SetScrollable(true).SetWrap(true)
+	textView.SetDynamicColors(true) // Enable color parsing
 	return textView
 }
 
-// func createSidebar() *tview.Table {
-// 	table := tview.NewTable()
-// 	table.SetBorder(true).SetTitle("System Status")
+func createSidebar() *tview.Table {
+	table := tview.NewTable()
+	table.SetBorder(true).SetTitle("System Status")
 
-// 	data := getSidebarData()
-// 	for row, rowData := range data {
-// 		for col, cellData := range rowData {
-// 			color := "[white]"
-// 			if row == 0 {
-// 				color = "[yellow]" // Header row
-// 			} else if col == 2 { // Status column
-// 				switch cellData {
-// 				case "OK":
-// 					color = "[green]"
-// 				case "Warning":
-// 					color = "[orange]"
-// 				case "Error":
-// 					color = "[red]"
-// 				}
-// 			}
+	data := getSidebarData()
+	for row, rowData := range data {
+		for col, cellData := range rowData {
+			color := "[white]"
+			if row == 0 {
+				color = "[yellow]" // Header row
+			} else if col == 2 { // Status column
+				switch cellData {
+				case "OK":
+					color = "[green]"
+				case "Warning":
+					color = "[orange]"
+				case "Error":
+					color = "[red]"
+				}
+			}
 
-// 			table.SetCell(row, col, tview.NewTableCell(color+cellData).
-// 				SetAlign(tview.AlignCenter).
-// 				SetSelectable(row != 0))
-// 		}
-// 	}
+			table.SetCell(row, col, tview.NewTableCell(color+cellData).
+				SetAlign(tview.AlignCenter).
+				SetSelectable(row != 0))
+		}
+	}
 
-// 	return table
-// }
+	return table
+}
 
 func createHeader() *tview.TextView {
 	header := tview.NewTextView()
 	header.SetBorder(true)
 	header.SetText(getHeaderText())
 	header.SetTextAlign(tview.AlignCenter)
+	header.SetDynamicColors(true) // Enable color parsing
 	return header
 }
 
@@ -123,6 +133,7 @@ func createFooter() *tview.TextView {
 	footer.SetBorder(true)
 	footer.SetText(getFooterText())
 	footer.SetTextAlign(tview.AlignCenter)
+	footer.SetDynamicColors(true) // Enable color parsing
 	return footer
 }
 
@@ -136,15 +147,15 @@ func updateHeader(header *tview.TextView) {
 
 func setupGrid(state *AppState) *tview.Grid {
 	grid := tview.NewGrid().
-		SetRows(2, 0).
+		SetRows(3, 0, 3).
 		SetColumns(25, 0).
 		SetBorders(false) // We handle borders on individual components
 
-	// Static items
-	grid.AddItem(state.header, 0, 0, 1, 3, 0, 0, false)
-	grid.AddItem(state.footer, 2, 0, 1, 3, 0, 0, false)
+	// Static items (header and footer span both columns)
+	grid.AddItem(state.header, 0, 0, 1, 2, 0, 0, false)
+	grid.AddItem(state.footer, 2, 0, 1, 2, 0, 0, false)
 
-	// Main layout
+	// Main layout (2 columns: menu + main content)
 	grid.AddItem(state.menu, 1, 0, 1, 1, 0, 80, true)
 	grid.AddItem(state.main, 1, 1, 1, 1, 0, 80, false)
 
@@ -175,14 +186,34 @@ func startPeriodicUpdates(state *AppState) {
 	}()
 }
 
+func setupRosePineTheme() {
+	// Rose Pine color palette
+	tview.Styles = tview.Theme{
+		PrimitiveBackgroundColor:    tcell.NewRGBColor(35, 33, 54),    // base (#232136)
+		ContrastBackgroundColor:     tcell.NewRGBColor(42, 39, 63),    // surface (#2a273f)
+		MoreContrastBackgroundColor: tcell.NewRGBColor(57, 53, 82),    // overlay (#393552)
+		BorderColor:                 tcell.NewRGBColor(110, 106, 134), // muted (#6e6a86)
+		TitleColor:                  tcell.NewRGBColor(235, 188, 186), // rose (#ebbcba)
+		GraphicsColor:               tcell.NewRGBColor(156, 207, 216), // foam (#9ccfd8)
+		PrimaryTextColor:            tcell.NewRGBColor(224, 222, 244), // text (#e0def4)
+		SecondaryTextColor:          tcell.NewRGBColor(144, 140, 170), // subtle (#908caa)
+		TertiaryTextColor:           tcell.NewRGBColor(110, 106, 134), // muted (#6e6a86)
+		InverseTextColor:            tcell.NewRGBColor(35, 33, 54),    // base (#232136)
+		ContrastSecondaryTextColor:  tcell.NewRGBColor(224, 222, 244), // text (#e0def4)
+	}
+}
+
 func createApp() *AppState {
+	// Setup Rose Pine theme
+	setupRosePineTheme()
+
 	state := &AppState{}
 
 	// Create components with data
 	state.header = createHeader()
 	state.footer = createFooter()
 	state.main = createMainContent()
-	// state.sidebar = createSidebar()
+	// Remove sidebar for 2-column layout
 
 	// Menu with callback to update main content
 	state.menu = createMenu(func(selection string) {
