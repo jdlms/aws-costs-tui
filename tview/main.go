@@ -33,6 +33,7 @@ func getMainContent(section string) string {
 		"[green]Uptime:[white] 5d 12h (OK)"
 
 	content := map[string]string{
+		"Date":      fmt.Sprint(time.Now().Format("January 2, 2006")),
 		"Dashboard": "Welcome to the dashboard!\n\nSystem Status: Online\nActive Users: 42\nLast Update: " + time.Now().Format("15:04:05") + sidebarInfo,
 		"Users":     "User Management\n\nTotal Users: 1,234\nActive: 987\nInactive: 247\n\nRecent Activity:\n- John logged in\n- Jane updated profile\n- Bob logged out",
 		"Settings":  "Application Settings\n\nTheme: Rose Pine\nLanguage: English\nNotifications: Enabled\nAuto-save: Every 5 minutes",
@@ -45,20 +46,8 @@ func getMainContent(section string) string {
 	return "Select a menu item to view content"
 }
 
-func getSidebarData() [][]string {
-	return [][]string{
-		{"Metric", "Value", "Status"},
-		{"CPU", "45%", "OK"},
-		{"Memory", "67%", "Warning"},
-		{"Disk", "23%", "OK"},
-		{"Network", "12MB/s", "OK"},
-		{"Errors", "3", "Warning"},
-		{"Uptime", "5d 12h", "OK"},
-	}
-}
-
 func getHeaderText() string {
-	return fmt.Sprintf("TUI Dashboard (Rose Pine) - %s", time.Now().Format("2006-01-02 15:04:05"))
+	return "💸 Cost check 💸"
 }
 
 func getFooterText() string {
@@ -87,36 +76,6 @@ func createMainContent() *tview.TextView {
 	textView.SetScrollable(true).SetWrap(true)
 	textView.SetDynamicColors(true) // Enable color parsing
 	return textView
-}
-
-func createSidebar() *tview.Table {
-	table := tview.NewTable()
-	table.SetBorder(true).SetTitle("System Status")
-
-	data := getSidebarData()
-	for row, rowData := range data {
-		for col, cellData := range rowData {
-			color := "[white]"
-			if row == 0 {
-				color = "[yellow]" // Header row
-			} else if col == 2 { // Status column
-				switch cellData {
-				case "OK":
-					color = "[green]"
-				case "Warning":
-					color = "[orange]"
-				case "Error":
-					color = "[red]"
-				}
-			}
-
-			table.SetCell(row, col, tview.NewTableCell(color+cellData).
-				SetAlign(tview.AlignCenter).
-				SetSelectable(row != 0))
-		}
-	}
-
-	return table
 }
 
 func createHeader() *tview.TextView {
@@ -162,12 +121,31 @@ func setupGrid(state *AppState) *tview.Grid {
 	return grid
 }
 
-func setupKeyBindings(app *tview.Application) {
+func setupKeyBindings(app *tview.Application, state *AppState) {
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Rune() {
 		case 'q':
 			app.Stop()
 			return nil
+		case 'j':
+			// Move down in menu
+			if app.GetFocus() == state.menu {
+				currentIndex := state.menu.GetCurrentItem()
+				itemCount := state.menu.GetItemCount()
+				if currentIndex < itemCount-1 {
+					state.menu.SetCurrentItem(currentIndex + 1)
+				}
+				return nil
+			}
+		case 'k':
+			// Move up in menu
+			if app.GetFocus() == state.menu {
+				currentIndex := state.menu.GetCurrentItem()
+				if currentIndex > 0 {
+					state.menu.SetCurrentItem(currentIndex - 1)
+				}
+				return nil
+			}
 		}
 		return event
 	})
@@ -229,7 +207,7 @@ func createApp() *AppState {
 		SetFocus(state.menu)
 
 	// Setup key bindings
-	setupKeyBindings(state.app)
+	setupKeyBindings(state.app, state)
 
 	// Start periodic updates
 	startPeriodicUpdates(state)
