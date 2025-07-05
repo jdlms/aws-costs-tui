@@ -5,7 +5,6 @@ go 1.24.3
 require (
 	github.com/aws/aws-sdk-go-v2/config v1.29.17
 	github.com/aws/aws-sdk-go-v2/service/costexplorer v1.51.2
-	github.com/gdamore/tcell v1.4.0
 	github.com/gdamore/tcell/v2 v2.8.1
 	github.com/rivo/tview v0.0.0-20250625164341-a4a78f1e05cb
 )
