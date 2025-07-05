@@ -1,8 +1,9 @@
 package ui
 
 import (
-	"github.com/rivo/tview"
 	"cost-explorer/internal/types"
+
+	"github.com/rivo/tview"
 )
 
 // SetupGrid configures the main grid layout

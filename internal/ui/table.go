@@ -5,8 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rivo/tview"
 	"cost-explorer/internal/types"
+
+	"github.com/rivo/tview"
 )
 
 // PopulateTable fills the table with cost data

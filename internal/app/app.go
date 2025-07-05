@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/rivo/tview"
 	"cost-explorer/internal/cache"
 	"cost-explorer/internal/types"
 	"cost-explorer/internal/ui"
+
+	"github.com/rivo/tview"
 )
 
 // App wraps the table for the interface

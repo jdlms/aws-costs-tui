@@ -3,8 +3,9 @@ package app
 import (
 	"log"
 
-	"github.com/gdamore/tcell/v2"
 	"cost-explorer/internal/types"
+
+	"github.com/gdamore/tcell/v2"
 )
 
 // GetMenuItems returns the list of menu items
