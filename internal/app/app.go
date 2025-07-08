@@ -3,23 +3,14 @@ package app
 import (
 	"fmt"
 	"log"
+	"sync"
 
-	"cost-explorer/internal/cache"
+	"cost-explorer/internal/aws"
 	"cost-explorer/internal/types"
 	"cost-explorer/internal/ui"
 
 	"github.com/rivo/tview"
 )
-
-// App wraps the table for the interface
-type App struct {
-	state *types.AppState
-}
-
-// PopulateTable implements the TablePopulator interface
-func (a *App) PopulateTable(data types.CostData) {
-	ui.PopulateTable(a.state.MainTable, data)
-}
 
 // CreateApp initializes and returns the application state
 func CreateApp(client *types.AppState) *types.AppState {
@@ -56,73 +47,104 @@ func CreateApp(client *types.AppState) *types.AppState {
 		Title: "Welcome to AWS Cost Explorer",
 		Rows: [][]string{
 			{"Status", "Message"},
-			{"Initializing", "Loading cost data in the background..."},
+			{"Initializing", "Loading cost data..."},
 			{"Tip", "Use j/k or arrow keys to navigate, Enter to select"},
 		},
 	}
 	ui.PopulateTable(state.MainTable, initialData)
 
-	// Preload all data concurrently on startup
-	appWrapper := &App{state: state}
-	go cache.PreloadAllData(state, appWrapper)
+	// Load all data concurrently on startup
+	go LoadAllData(state)
 
 	return state
 }
 
+// LoadAllData fetches all cost data concurrently and stores it in memory
+func LoadAllData(state *types.AppState) {
+	log.Printf("Starting concurrent data loading...")
+
+	state.App.QueueUpdateDraw(func() {
+		state.Header.SetText("[yellow]Loading all cost data...[-]")
+	})
+
+	var wg sync.WaitGroup
+	sections := []string{"Dashboard", "Current Month", "Forecast", "By Service", "By Region", "By Usage Type"}
+
+	// Start all API calls concurrently
+	for _, section := range sections {
+		wg.Add(1)
+		go func(sectionName string) {
+			defer wg.Done()
+
+			log.Printf("Fetching %s data...", sectionName)
+			var data types.CostData
+
+			switch sectionName {
+			case "Dashboard":
+				data = aws.GetDashboardData(state.Client)
+			case "Current Month":
+				data = aws.GetCurrentMonthData(state.Client)
+			case "Forecast":
+				data = aws.GetForecastData(state.Client)
+			case "By Service":
+				data = aws.GetServiceData(state.Client)
+			case "By Region":
+				data = aws.GetRegionData(state.Client)
+			case "By Usage Type":
+				data = aws.GetUsageTypeData(state.Client)
+			}
+
+			// Store data in memory
+			state.CacheMutex.Lock()
+			state.DataCache[sectionName] = data
+			state.CacheMutex.Unlock()
+
+			log.Printf("Loaded %s data", sectionName)
+		}(section)
+	}
+
+	// Wait for all goroutines to complete
+	wg.Wait()
+	log.Printf("All data loaded successfully!")
+
+	// Show dashboard by default
+	state.App.QueueUpdateDraw(func() {
+		state.Header.SetText("[green]AWS Cost Explorer - Dashboard")
+		state.CacheMutex.RLock()
+		if dashboardData, exists := state.DataCache["Dashboard"]; exists {
+			ui.PopulateTable(state.MainTable, dashboardData)
+		}
+		state.CacheMutex.RUnlock()
+	})
+}
+
 // UpdateContent handles menu selection and updates the display
 func UpdateContent(state *types.AppState, section string) {
-	log.Printf("Starting updateContent for section: %s", section)
+	log.Printf("Updating content for section: %s", section)
 
-	// Check if data is cached
+	// Check if data is already loaded
 	state.CacheMutex.RLock()
 	data, exists := state.DataCache[section]
 	state.CacheMutex.RUnlock()
 
-	log.Printf("Data exists for %s: %v", section, exists)
-
 	if exists {
-		// Use cached data - instant response!
-		log.Printf("Using cached data for %s", section)
-
-		// Update header first
-		go func() {
-			state.App.QueueUpdateDraw(func() {
-				state.Header.SetText(fmt.Sprintf("[green]AWS Cost Explorer - %s[-] (Cached data)", section))
-			})
-		}()
-
-		// Then update table in a separate goroutine to prevent blocking
-		go func() {
-			state.App.QueueUpdateDraw(func() {
-				log.Printf("About to populate table for %s", section)
-				ui.PopulateTable(state.MainTable, data)
-				log.Printf("Finished populating table for %s", section)
-			})
-		}()
-
-		log.Printf("Successfully queued UI updates for %s", section)
+		// Use already loaded data
+		log.Printf("Using loaded data for %s", section)
+		state.Header.SetText(fmt.Sprintf("[green]AWS Cost Explorer - %s[-]", section))
+		ui.PopulateTable(state.MainTable, data)
 	} else {
 		// Data not loaded yet, show loading message
 		log.Printf("Data for %s not ready yet, showing loading message", section)
 
-		emptyData := types.CostData{
+		loadingData := types.CostData{
 			Title: fmt.Sprintf("%s - Loading...", section),
 			Rows: [][]string{
 				{"Status", "Message"},
-				{"Loading", "Data is being fetched in the background..."},
+				{"Loading", "Data is being fetched..."},
 			},
 		}
 
-		go func() {
-			state.App.QueueUpdateDraw(func() {
-				state.Header.SetText(fmt.Sprintf("[yellow]%s data still loading...[-]", section))
-			})
-		}()
-
-		go func() {
-			state.App.QueueUpdateDraw(func() {
-				ui.PopulateTable(state.MainTable, emptyData)
-			})
-		}()
+		state.Header.SetText(fmt.Sprintf("[yellow]%s data still loading...[-]", section))
+		ui.PopulateTable(state.MainTable, loadingData)
 	}
 }
