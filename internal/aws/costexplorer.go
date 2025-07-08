@@ -10,27 +10,56 @@ import (
 
 	"cost-explorer/internal/types"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer"
 	awstypes "github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
 )
+
+// getCurrentMonthPeriod returns the current month date interval
+func getCurrentMonthPeriod() awstypes.DateInterval {
+	now := time.Now()
+	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	end := start.AddDate(0, 1, 0).Add(-time.Nanosecond)
+
+	return awstypes.DateInterval{
+		Start: aws.String(start.Format("2006-01-02")),
+		End:   aws.String(end.Format("2006-01-02")),
+	}
+}
+
+// getPreviousMonthPeriod returns the previous month date interval
+func getPreviousMonthPeriod() awstypes.DateInterval {
+	now := time.Now()
+	start := time.Date(now.Year(), now.Month()-1, 1, 0, 0, 0, 0, time.UTC)
+	end := start.AddDate(0, 1, 0).Add(-time.Nanosecond)
+
+	return awstypes.DateInterval{
+		Start: aws.String(start.Format("2006-01-02")),
+		End:   aws.String(end.Format("2006-01-02")),
+	}
+}
+
+// getNextMonthPeriod returns the next month date interval
+func getNextMonthPeriod() awstypes.DateInterval {
+	now := time.Now()
+	start := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, time.UTC)
+	end := start.AddDate(0, 1, 0).Add(-time.Nanosecond)
+
+	return awstypes.DateInterval{
+		Start: aws.String(start.Format("2006-01-02")),
+		End:   aws.String(end.Format("2006-01-02")),
+	}
+}
 
 // GetDashboardData fetches dashboard overview data
 func GetDashboardData(client *costexplorer.Client) types.CostData {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	now := time.Now()
-	currentMonthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-	nextMonthStart := currentMonthStart.AddDate(0, 1, 0)
-
-	startDate := currentMonthStart.Format("2006-01-02")
-	endDate := nextMonthStart.Format("2006-01-02")
+	period := getCurrentMonthPeriod()
 
 	result, err := client.GetCostAndUsage(ctx, &costexplorer.GetCostAndUsageInput{
-		TimePeriod: &awstypes.DateInterval{
-			Start: &startDate,
-			End:   &endDate,
-		},
+		TimePeriod:  &period,
 		Granularity: awstypes.GranularityMonthly,
 		Metrics:     []string{"BlendedCost", "UnblendedCost", "NetUnblendedCost"},
 	})
@@ -70,21 +99,10 @@ func GetForecastData(client *costexplorer.Client) types.CostData {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	now := time.Now()
-	nextMonthStart := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, now.Location())
-	if nextMonthStart.Month() == 1 {
-		nextMonthStart = time.Date(now.Year()+1, 1, 1, 0, 0, 0, 0, now.Location())
-	}
-	nextMonthEnd := nextMonthStart.AddDate(0, 1, 0)
-
-	startDate := nextMonthStart.Format("2006-01-02")
-	endDate := nextMonthEnd.Format("2006-01-02")
+	period := getNextMonthPeriod()
 
 	forecast, err := client.GetCostForecast(ctx, &costexplorer.GetCostForecastInput{
-		TimePeriod: &awstypes.DateInterval{
-			Start: &startDate,
-			End:   &endDate,
-		},
+		TimePeriod:  &period,
 		Granularity: awstypes.GranularityMonthly,
 		Metric:      awstypes.MetricBlendedCost,
 	})
@@ -102,8 +120,8 @@ func GetForecastData(client *costexplorer.Client) types.CostData {
 		return types.CostData{Title: "Cost Forecast", Rows: rows}
 	}
 
-	period := fmt.Sprintf("%s to %s", startDate, endDate)
-	rows = append(rows, []string{"Predicted Total Cost", formatCost(forecast.Total.Amount), period})
+	periodStr := fmt.Sprintf("%s to %s", *period.Start, *period.End)
+	rows = append(rows, []string{"Predicted Total Cost", formatCost(forecast.Total.Amount), periodStr})
 
 	if forecast.ForecastResultsByTime != nil {
 		for _, forecastResult := range forecast.ForecastResultsByTime {
@@ -120,17 +138,10 @@ func GetServiceData(client *costexplorer.Client) types.CostData {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	now := time.Now()
-	thirtyDaysAgo := now.AddDate(0, 0, -30)
-
-	startDate := thirtyDaysAgo.Format("2006-01-02")
-	endDate := now.Format("2006-01-02")
+	period := getCurrentMonthPeriod()
 
 	result, err := client.GetCostAndUsage(ctx, &costexplorer.GetCostAndUsageInput{
-		TimePeriod: &awstypes.DateInterval{
-			Start: &startDate,
-			End:   &endDate,
-		},
+		TimePeriod:  &period,
 		Granularity: awstypes.GranularityMonthly,
 		Metrics:     []string{"BlendedCost"},
 		GroupBy: []awstypes.GroupDefinition{
@@ -142,7 +153,7 @@ func GetServiceData(client *costexplorer.Client) types.CostData {
 	})
 
 	rows := [][]string{
-		{"Service", "Cost (30 days)", "Percentage"},
+		{"Service", "Cost (Current Month)", "Percentage"},
 	}
 
 	if err != nil {
@@ -193,7 +204,7 @@ func GetServiceData(client *costexplorer.Client) types.CostData {
 		})
 	}
 
-	return types.CostData{Title: "🛠️ Last 30 Days Costs by Service", Rows: rows}
+	return types.CostData{Title: "🛠️ Current Month Costs by Service", Rows: rows}
 }
 
 // GetRegionData fetches costs grouped by region
@@ -201,17 +212,10 @@ func GetRegionData(client *costexplorer.Client) types.CostData {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	now := time.Now()
-	thirtyDaysAgo := now.AddDate(0, 0, -30)
-
-	startDate := thirtyDaysAgo.Format("2006-01-02")
-	endDate := now.Format("2006-01-02")
+	period := getCurrentMonthPeriod()
 
 	result, err := client.GetCostAndUsage(ctx, &costexplorer.GetCostAndUsageInput{
-		TimePeriod: &awstypes.DateInterval{
-			Start: &startDate,
-			End:   &endDate,
-		},
+		TimePeriod:  &period,
 		Granularity: awstypes.GranularityMonthly,
 		Metrics:     []string{"BlendedCost"},
 		GroupBy: []awstypes.GroupDefinition{
@@ -223,7 +227,7 @@ func GetRegionData(client *costexplorer.Client) types.CostData {
 	})
 
 	rows := [][]string{
-		{"Region", "Cost (30 days)", "Percentage"},
+		{"Region", "Cost (Current Month)", "Percentage"},
 	}
 
 	if err != nil {
@@ -282,17 +286,10 @@ func GetUsageTypeData(client *costexplorer.Client) types.CostData {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	now := time.Now()
-	thirtyDaysAgo := now.AddDate(0, 0, -30)
-
-	startDate := thirtyDaysAgo.Format("2006-01-02")
-	endDate := now.Format("2006-01-02")
+	period := getCurrentMonthPeriod()
 
 	result, err := client.GetCostAndUsage(ctx, &costexplorer.GetCostAndUsageInput{
-		TimePeriod: &awstypes.DateInterval{
-			Start: &startDate,
-			End:   &endDate,
-		},
+		TimePeriod:  &period,
 		Granularity: awstypes.GranularityMonthly,
 		Metrics:     []string{"BlendedCost"},
 		GroupBy: []awstypes.GroupDefinition{
@@ -304,7 +301,7 @@ func GetUsageTypeData(client *costexplorer.Client) types.CostData {
 	})
 
 	rows := [][]string{
-		{"Usage Type", "Cost (30 days)", "Percentage"},
+		{"Usage Type", "Cost (Current Month)", "Percentage"},
 	}
 
 	if err != nil {
@@ -371,18 +368,10 @@ func GetCurrentMonthData(client *costexplorer.Client) types.CostData {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	now := time.Now()
-	currentMonthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-	nextMonthStart := currentMonthStart.AddDate(0, 1, 0)
-
-	startDate := currentMonthStart.Format("2006-01-02")
-	endDate := nextMonthStart.Format("2006-01-02")
+	period := getCurrentMonthPeriod()
 
 	result, err := client.GetCostAndUsage(ctx, &costexplorer.GetCostAndUsageInput{
-		TimePeriod: &awstypes.DateInterval{
-			Start: &startDate,
-			End:   &endDate,
-		},
+		TimePeriod:  &period,
 		Granularity: awstypes.GranularityMonthly,
 		Metrics:     []string{"BlendedCost", "UnblendedCost", "NetUnblendedCost"},
 	})
@@ -414,7 +403,7 @@ func GetCurrentMonthData(client *costexplorer.Client) types.CostData {
 		}
 	}
 
-	return types.CostData{Title: fmt.Sprintf("📅 Current Month Costs (%s)", now.Format("January 2006")), Rows: rows}
+	return types.CostData{Title: fmt.Sprintf("📅 Current Month Costs (%s)", time.Now().Format("January 2006")), Rows: rows}
 }
 
 // formatCost formats a cost amount string for display

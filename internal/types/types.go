@@ -1,3 +1,4 @@
+// Package types: internal types
 package types
 
 import (
