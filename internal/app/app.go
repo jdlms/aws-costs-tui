@@ -68,7 +68,7 @@ func LoadAllData(state *types.AppState) {
 	})
 
 	var wg sync.WaitGroup
-	sections := []string{"Dashboard", "Current Month", "Forecast", "By Service", "By Region", "By Usage Type"}
+	sections := []string{"Dashboard", "By Service", "By Region", "By Usage Type"}
 
 	// Start all API calls concurrently
 	for _, section := range sections {
@@ -82,10 +82,6 @@ func LoadAllData(state *types.AppState) {
 			switch sectionName {
 			case "Dashboard":
 				data = aws.GetDashboardData(state.Client)
-			case "Current Month":
-				data = aws.GetCurrentMonthData(state.Client)
-			case "Forecast":
-				data = aws.GetForecastData(state.Client)
 			case "By Service":
 				data = aws.GetServiceData(state.Client)
 			case "By Region":
@@ -130,7 +126,7 @@ func UpdateContent(state *types.AppState, section string) {
 	if exists {
 		// Use already loaded data
 		log.Printf("Using loaded data for %s", section)
-		state.Header.SetText(fmt.Sprintf("[green]AWS Cost Explorer - %s[-]", section))
+		state.Header.SetText(fmt.Sprintf("[green]AWS Cost Explorer"))
 		ui.PopulateTable(state.MainTable, data)
 	} else {
 		// Data not loaded yet, show loading message

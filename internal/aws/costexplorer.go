@@ -51,44 +51,55 @@ func getNextMonthPeriod() awstypes.DateInterval {
 	}
 }
 
-// GetDashboardData fetches dashboard overview data
+// GetDashboardData fetches dashboard overview data with current month and forecast
 func GetDashboardData(client *costexplorer.Client) types.CostData {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	period := getCurrentMonthPeriod()
-
-	result, err := client.GetCostAndUsage(ctx, &costexplorer.GetCostAndUsageInput{
-		TimePeriod:  &period,
-		Granularity: awstypes.GranularityMonthly,
-		Metrics:     []string{"BlendedCost", "UnblendedCost", "NetUnblendedCost"},
-	})
-
 	rows := [][]string{
-		{"Metric", "Amount", "Period"},
+		{"Period", "Cost Type", "Amount"},
 	}
+
+	// Get current month data
+	currentPeriod := getCurrentMonthPeriod()
+	currentResult, err := client.GetCostAndUsage(ctx, &costexplorer.GetCostAndUsageInput{
+		TimePeriod:  &currentPeriod,
+		Granularity: awstypes.GranularityMonthly,
+		Metrics:     []string{"BlendedCost"},
+	})
 
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			rows = append(rows, []string{"Timeout", "Request timed out after 30 seconds", ""})
+			rows = append(rows, []string{"Current Month", "Timeout", "Request timed out after 30 seconds"})
 		} else {
-			rows = append(rows, []string{"Error", err.Error(), ""})
+			rows = append(rows, []string{"Current Month", "Error", err.Error()})
 		}
-		return types.CostData{Title: "Dashboard Overview", Rows: rows}
+	} else {
+		for _, resultByTime := range currentResult.ResultsByTime {
+			currentMonthName := time.Now().Format("January 2006")
+			if blendedCost, exists := resultByTime.Total["BlendedCost"]; exists {
+				rows = append(rows, []string{currentMonthName, "Current Month Total", formatCost(blendedCost.Amount)})
+			}
+		}
 	}
 
-	for _, resultByTime := range result.ResultsByTime {
-		period := fmt.Sprintf("%s to %s", *resultByTime.TimePeriod.Start, *resultByTime.TimePeriod.End)
+	// Get forecast data for next month
+	forecastPeriod := getNextMonthPeriod()
+	forecast, err := client.GetCostForecast(ctx, &costexplorer.GetCostForecastInput{
+		TimePeriod:  &forecastPeriod,
+		Granularity: awstypes.GranularityMonthly,
+		Metric:      awstypes.MetricBlendedCost,
+	})
 
-		if blendedCost, exists := resultByTime.Total["BlendedCost"]; exists {
-			rows = append(rows, []string{"Total Blended Cost", formatCost(blendedCost.Amount), period})
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			rows = append(rows, []string{"Next Month", "Timeout", "Request timed out after 30 seconds"})
+		} else {
+			rows = append(rows, []string{"Next Month", "Error", err.Error()})
 		}
-		if unblendedCost, exists := resultByTime.Total["UnblendedCost"]; exists {
-			rows = append(rows, []string{"Total Unblended Cost", formatCost(unblendedCost.Amount), period})
-		}
-		if netCost, exists := resultByTime.Total["NetUnblendedCost"]; exists {
-			rows = append(rows, []string{"Total Net Cost", formatCost(netCost.Amount), period})
-		}
+	} else {
+		nextMonthName := time.Now().AddDate(0, 1, 0).Format("January 2006")
+		rows = append(rows, []string{nextMonthName, "Forecasted Total", formatCost(forecast.Total.Amount)})
 	}
 
 	return types.CostData{Title: "💸 Dashboard Overview", Rows: rows}

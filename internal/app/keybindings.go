@@ -12,8 +12,6 @@ import (
 func GetMenuItems() []string {
 	return []string{
 		"Dashboard",
-		"Current Month",
-		"Forecast",
 		"By Service",
 		"By Region",
 		"By Usage Type",

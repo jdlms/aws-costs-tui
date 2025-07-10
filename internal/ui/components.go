@@ -11,8 +11,6 @@ func CreateMenu(onSelect func(string)) *tview.List {
 
 	menuItems := []string{
 		"Dashboard",
-		"Current Month",
-		"Forecast",
 		"By Service",
 		"By Region",
 		"By Usage Type",
@@ -31,7 +29,7 @@ func CreateMenu(onSelect func(string)) *tview.List {
 func CreateMainTable() *tview.Table {
 	table := tview.NewTable()
 	table.SetBorder(true).SetTitle("Cost Data")
-	table.SetSelectable(true, false)
+	table.SetSelectable(false, false)
 	return table
 }
 
