@@ -42,6 +42,12 @@ func PopulateTable(table *tview.Table, data types.CostData) {
 		}
 	}
 
+	// Identify top 3 costs for each month column (for service data highlighting)
+	topCostsByColumn := make(map[int]map[int]bool) // column -> row -> isTop3
+	if strings.Contains(data.Title, "Services") && len(data.Rows) > 1 {
+		topCostsByColumn = findTopCostsPerColumn(data.Rows)
+	}
+
 	// Add data rows
 	for row := 1; row < len(data.Rows); row++ {
 		if len(data.Rows[row]) == 0 {
@@ -51,25 +57,17 @@ func PopulateTable(table *tview.Table, data types.CostData) {
 
 		for col, cell := range data.Rows[row] {
 			color := "[white]"
-			// Color code amounts (assuming last column is usually the amount)
-			if col == len(data.Rows[row])-1 && strings.HasPrefix(cell, "$") {
-				if strings.Contains(cell, "$0.00") {
-					color = "[gray]"
-				} else {
-					amount := parseAmount(cell)
-					if amount > 100 {
-						color = "[red]"
-					} else if amount > 10 {
-						color = "[orange]"
-					} else {
-						color = "[green]"
-					}
-				}
+
+			// Check if this cell should be highlighted as top 3 cost
+			if topCostsByColumn[col] != nil && topCostsByColumn[col][row] {
+				color = "[yellow]"
+			} else if strings.HasPrefix(cell, "$") {
+				color = "[-]" // Default color for dollar amounts
 			}
 
 			table.SetCell(row, col, tview.NewTableCell(color+cell+"[-]").
 				SetAlign(tview.AlignLeft).
-				SetSelectable(row != 0))
+				SetSelectable(true))
 		}
 	}
 
@@ -82,4 +80,49 @@ func parseAmount(amountStr string) float64 {
 	cleaned := strings.ReplaceAll(strings.TrimPrefix(amountStr, "$"), ",", "")
 	amount, _ := strconv.ParseFloat(cleaned, 64)
 	return amount
+}
+
+// findTopCostsPerColumn identifies the top 3 costs in each month column for highlighting
+func findTopCostsPerColumn(rows [][]string) map[int]map[int]bool {
+	result := make(map[int]map[int]bool)
+
+	if len(rows) < 2 {
+		return result
+	}
+
+	// Skip first column (service names) and process cost columns
+	for col := 1; col < len(rows[0]); col++ {
+		// Collect all costs for this column with their row indices
+		type costRow struct {
+			amount float64
+			row    int
+		}
+
+		var costs []costRow
+		for row := 1; row < len(rows); row++ {
+			if col < len(rows[row]) {
+				amount := parseAmount(rows[row][col])
+				if amount > 0 {
+					costs = append(costs, costRow{amount: amount, row: row})
+				}
+			}
+		}
+
+		// Sort by amount descending
+		for i := 0; i < len(costs)-1; i++ {
+			for j := i + 1; j < len(costs); j++ {
+				if costs[i].amount < costs[j].amount {
+					costs[i], costs[j] = costs[j], costs[i]
+				}
+			}
+		}
+
+		// Mark top 3 costs for this column
+		result[col] = make(map[int]bool)
+		for i := 0; i < len(costs) && i < 3; i++ {
+			result[col][costs[i].row] = true
+		}
+	}
+
+	return result
 }

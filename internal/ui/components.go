@@ -29,7 +29,8 @@ func CreateMenu(onSelect func(string)) *tview.List {
 func CreateMainTable() *tview.Table {
 	table := tview.NewTable()
 	table.SetBorder(true).SetTitle("Cost Data")
-	table.SetSelectable(false, false)
+	table.SetSelectable(true, false) // Allow row selection but not column selection
+	table.SetFixed(1, 0)             // Fix the first row as header
 	return table
 }
 
@@ -47,7 +48,7 @@ func CreateHeader() *tview.TextView {
 func CreateFooter() *tview.TextView {
 	footer := tview.NewTextView()
 	footer.SetBorder(true)
-	footer.SetText("Press 'q' to quit | 'j/k' or ↑/↓ to navigate | Enter to select")
+	footer.SetText("Press 'q' to quit | 'j/k' to navigate | Enter to select & enter table | Tab to return to menu | PgUp/PgDn to page")
 	footer.SetTextAlign(tview.AlignCenter)
 	footer.SetDynamicColors(true)
 	return footer

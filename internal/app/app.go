@@ -48,7 +48,6 @@ func CreateApp(client *types.AppState) *types.AppState {
 		Rows: [][]string{
 			{"Status", "Message"},
 			{"Initializing", "Loading cost data..."},
-			{"Tip", "Use j/k or arrow keys to navigate, Enter to select"},
 		},
 	}
 	ui.PopulateTable(state.MainTable, initialData)
@@ -68,7 +67,7 @@ func LoadAllData(state *types.AppState) {
 	})
 
 	var wg sync.WaitGroup
-	sections := []string{"Dashboard", "By Service", "By Region", "By Usage Type"}
+	sections := []string{"Dashboard", "By Service", "By Usage Type", "By Region"}
 
 	// Start all API calls concurrently
 	for _, section := range sections {
@@ -126,11 +125,11 @@ func UpdateContent(state *types.AppState, section string) {
 	if exists {
 		// Use already loaded data
 		log.Printf("Using loaded data for %s", section)
-		state.Header.SetText(fmt.Sprintf("[green]AWS Cost Explorer"))
+		state.Header.SetText("[green]AWS Cost Explorer")
 		ui.PopulateTable(state.MainTable, data)
 	} else {
-		// Data not loaded yet, show loading message
-		log.Printf("Data for %s not ready yet, showing loading message", section)
+		// Data not loaded yet, show loading message and fetch asynchronously
+		log.Printf("Data for %s not ready yet, fetching asynchronously", section)
 
 		loadingData := types.CostData{
 			Title: fmt.Sprintf("%s - Loading...", section),
@@ -140,7 +139,43 @@ func UpdateContent(state *types.AppState, section string) {
 			},
 		}
 
-		state.Header.SetText(fmt.Sprintf("[yellow]%s data still loading...[-]", section))
+		state.Header.SetText(fmt.Sprintf("[yellow]%s data loading...[-]", section))
 		ui.PopulateTable(state.MainTable, loadingData)
+
+		// Fetch data asynchronously to avoid blocking the UI
+		go func(sectionName string) {
+			log.Printf("Fetching %s data asynchronously...", sectionName)
+			var data types.CostData
+
+			switch sectionName {
+			case "Dashboard":
+				data = aws.GetDashboardData(state.Client)
+			case "By Service":
+				data = aws.GetServiceData(state.Client)
+			case "By Region":
+				data = aws.GetRegionData(state.Client)
+			case "By Usage Type":
+				data = aws.GetUsageTypeData(state.Client)
+			}
+
+			// Store data in cache
+			state.CacheMutex.Lock()
+			state.DataCache[sectionName] = data
+			state.CacheMutex.Unlock()
+
+			// Update UI on main thread
+			state.App.QueueUpdateDraw(func() {
+				// Only update if user is still on the same section
+				state.CacheMutex.RLock()
+				currentData, exists := state.DataCache[sectionName]
+				state.CacheMutex.RUnlock()
+
+				if exists {
+					state.Header.SetText("[green]AWS Cost Explorer")
+					ui.PopulateTable(state.MainTable, currentData)
+					log.Printf("Updated UI with %s data", sectionName)
+				}
+			})
+		}(section)
 	}
 }
