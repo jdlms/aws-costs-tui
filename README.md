@@ -1,27 +1,30 @@
+Where's all that money going?
+
+```
 ├── cmd
-│   └── main.go
+│   ├── cost-explorer
+│   │   ├── cost-explorer.log
+│   │   └── main.go
+│   ├── init.go
+│   └── root.go
+├── cost-explorer
+├── cost-explorer.log
+├── go.mod
+├── go.sum
 ├── internal
 │   ├── app
 │   │   ├── app.go
-│   │   └── state.go
+│   │   └── keybindings.go
 │   ├── aws
 │   │   ├── client.go
-│   │   ├── cost_data.go
-│   │   ├── dashboard.go
-│   │   ├── forecast.go
-│   │   ├── region.go
-│   │   ├── service.go
-│   │   └── usage_type.go
-│   ├── cache.go
-│   ├── types.go
+│   │   └── costexplorer.go
+│   ├── cache
+│   ├── types
+│   │   └── types.go
 │   └── ui
-│   ├── components
-│   │   ├── footer.go
-│   │   ├── header.go
-│   │   ├── menu.go
-│   │   └── table.go
-│   ├── keybindings.go
-│   ├── layout.go
-│   └── themes
-│   └── rosepine.go
-├── readme.md
+│       ├── components.go
+│       ├── layout.go
+│       ├── table.go
+│       └── theme.go
+└── README.md
+```
