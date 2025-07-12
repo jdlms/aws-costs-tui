@@ -29,6 +29,7 @@ go.work
 *.swo
 *~
 .opencode
+.vscode
 
 # OS generated files
 .DS_Store
@@ -57,6 +58,9 @@ credentials
 # Application specific
 cost-explorer
 go-cost-explorer
+*.db
+*.sqlite
+*.sqlite3
 
 # Debug files
 debug
